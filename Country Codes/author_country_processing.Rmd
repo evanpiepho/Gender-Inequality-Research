@@ -139,23 +139,11 @@ for (i in which(is.na(dat$author.s.country))) {
 ```{r}
 # Change misidentified countries
 dat$author.s.country[dat$author.s.country == "Hamburg"] <- "Germany"
-
-# More Germany
 dat$author.s.country[grepl("Deutschland", dat$author.s.institution)] <- "Germany"
-
-# If "Republic of Korea" is found in author.s.institution, write "South Korea" in author.s.country
 dat$author.s.country[grepl("Republic of Korea", dat$author.s.institution)] <- "South Korea"
-
-# If "Brasil" is found in author.s.institution, write "Brazil" in author.s.country
 dat$author.s.country[grepl("Brasil", dat$author.s.institution)] <- "Brazil"
-
-# If "México" is found in author.s.institution, write "Mexico" in author.s.country
 dat$author.s.country[grepl("México", dat$author.s.institution)] <- "Mexico"
-
-# If "España" is found in author.s.institution, write "Spain" in author.s.country
 dat$author.s.country[grepl("España", dat$author.s.institution)] <- "Spain"
-
-# If "Shanghai" is found in author.s.institution, write "China" in author.s.country
 dat$author.s.country[grepl("Shanghai", dat$author.s.institution)] <- "China"
 
 # If "NYU" is found in author.s.institution, write "United States" in author.s.country
@@ -170,7 +158,7 @@ dat$author.s.country[grepl("\\bÜNİVERSİTESİ\\b", dat$author.s.institution)] 
 
 
 ```{r}
-# Global search for country code misses
+# Global search for countrycode package misses
 
 # Read the CSV file containing all the countries in the world
 countries <- read.csv(here("Country Codes", "Data", "countries.csv"))
@@ -238,7 +226,7 @@ head(sorted_word_freq, 30)
 
 
 ```{r}
-#If remaining <600, then finish manually
+# If remaining <600, then finish manually
 remaining_na <- filter(dat, is.na(author.s.country))
 
 print(remaining_na)
