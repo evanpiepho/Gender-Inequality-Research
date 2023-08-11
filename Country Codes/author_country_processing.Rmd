@@ -98,7 +98,7 @@ dat$author.s.country <- ifelse(is.na(dat$author.s.country) & grepl(paste0("\\b",
 
 remaining_na <- filter(dat, is.na(author.s.country))
 
-print(remaining_na)
+head(remaining_na) %>% pander()
 ```
 
 
@@ -220,7 +220,7 @@ word_freq <- table(words)
 sorted_word_freq <- sort(word_freq, decreasing = TRUE)
 
 # Print the top common words
-head(sorted_word_freq, 30)
+head(sorted_word_freq, 30) %>% pander()
 ```
 
 
@@ -229,7 +229,9 @@ head(sorted_word_freq, 30)
 # If remaining <600, then finish manually
 remaining_na <- filter(dat, is.na(author.s.country))
 
-print(remaining_na)
+head(remaining_na) %>% pander()
+
+count(remaining_na) %>% pander()
 ```
 
 
