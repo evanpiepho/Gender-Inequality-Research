@@ -1,0 +1,103 @@
+---
+title: "Countries"
+author: "Evan Piepho"
+date: "2023-07-13"
+output:
+  html_document:
+    theme: readable
+    df_print: paged
+---
+    
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library( here )
+library( countrycode )
+library( jsonlite )
+library( dplyr )
+library( pander )
+library( stringi )
+```
+```{r}
+setwd(here("Country Codes"))
+```
+
+
+```{r}
+
+#JSON pulled from a Times Higher Education ranking. 
+
+df_times <- fromJSON("world_university_rankings_2023_0__83be12210294c582db8740ee29673120.json")
+```
+
+
+```{r}
+df_times_clean <- data.frame(df_times$data$name,df_times$data$location)
+```
+
+
+```{r}
+# Previously completed several steps in this CSV. 
+
+dat <- read.csv("Dimensions_ChatGPT&LLM_authorsCountries.csv")
+```
+```{r}
+# Iterate over the rows in dat
+for (i in 1:nrow(dat)) {
+  # Use stri_detect_fixed to check if any name in df_times_clean$df_times.data.name is contained in dat$author.s.institution[i]
+  matches <- stri_detect_fixed(dat$author.s.institution[i], df_times_clean$df_times.data.name)
+  
+  # If there is a match, assign the corresponding location to dat$author.s.country
+  if (any(matches)) {
+    dat$author.s.country[i] <- df_times_clean$df_times.data.location[which(matches)[1]]
+  }
+}
+```
+
+
+```{r, warning=FALSE}
+# This function will write dat$author.s.country with matching values in dat$author.s.institution based on country code or name.
+
+dat$author.s.country <- ifelse(is.na(dat$author.s.country), countrycode(sourcevar = dat$author.s.institution, origin = "country.name", destination = "country.name"), dat$author.s.country)
+```
+
+
+```{r}
+head(dat)
+```
+
+
+```{r}
+# CSVs of US and UK Universities, since most missing institutions are from there. 
+
+us_unis <- read.csv("us_universities.csv")
+uk_unis <- read.csv("uk_universities_locations.csv")
+```
+
+
+```{r}
+# Replace NA values in dat$author.s.country with "United States" for US universities
+dat$author.s.country <- ifelse(is.na(dat$author.s.country) & grepl(paste0("\\b", paste(us_unis$name, collapse = "\\b|\\b"), "\\b"), dat$author.s.institution, ignore.case = TRUE), "United States", dat$author.s.country)
+
+# Replace NA values in dat$author.s.country with "United Kingdom" for UK universities
+dat$author.s.country <- ifelse(is.na(dat$author.s.country) & grepl(paste0("\\b", paste(uk_unis$Name, collapse = "\\b|\\b"), "\\b"), dat$author.s.institution, ignore.case = TRUE), "United Kingdom", dat$author.s.country)
+```
+
+
+```{r}
+# See how many NA values remaining to see if manual search is feasible
+
+remaining_na <- filter(dat, is.na(author.s.country))
+
+print(remaining_na)
+```
+
+```{r}
+# write.csv(dat, file="author_country_7_13.csv", fileEncoding = "UTF-8")
+```
+
+
