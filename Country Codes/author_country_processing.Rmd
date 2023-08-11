@@ -21,7 +21,10 @@ library( jsonlite )
 library( dplyr )
 library( pander )
 library( stringi )
+library( stringr )
 ```
+
+
 ```{r}
 setwd(here("Country Codes"))
 ```
@@ -29,22 +32,24 @@ setwd(here("Country Codes"))
 
 ```{r}
 
-#JSON pulled from a Times Higher Education ranking. 
+# JSON pulled from a Times Higher Education ranking 
 
-df_times <- fromJSON("world_university_rankings_2023_0__83be12210294c582db8740ee29673120.json")
+df_times <- fromJSON(here("Country Codes", "Data", "world_university_rankings_2023_0__83be12210294c582db8740ee29673120.json"))
 ```
 
 
 ```{r}
-df_times_clean <- data.frame(df_times$data$name,df_times$data$location)
+df_times_clean <- data.frame(here("Country Codes", "Data", df_times$data$name,df_times$data$location))
 ```
 
 
 ```{r}
-# Previously completed several steps in this CSV. 
+# Previously completed several steps in this CSV 
 
-dat <- read.csv("Dimensions_ChatGPT&LLM_authorsCountries.csv")
+dat <- read.csv(here("Country Codes", "Data", "Dimensions_ChatGPT&LLM_authorsCountries.csv"))
 ```
+
+
 ```{r}
 # Iterate over the rows in dat
 for (i in 1:nrow(dat)) {
@@ -60,7 +65,7 @@ for (i in 1:nrow(dat)) {
 
 
 ```{r, warning=FALSE}
-# This function will write dat$author.s.country with matching values in dat$author.s.institution based on country code or name.
+# This function will write dat$author.s.country with matching values in dat$author.s.institution based on country code or name
 
 dat$author.s.country <- ifelse(is.na(dat$author.s.country), countrycode(sourcevar = dat$author.s.institution, origin = "country.name", destination = "country.name"), dat$author.s.country)
 ```
@@ -72,10 +77,10 @@ head(dat)
 
 
 ```{r}
-# CSVs of US and UK Universities, since most missing institutions are from there. 
+# CSVs of US and UK Universities, since most missing institutions are from there 
 
-us_unis <- read.csv("us_universities.csv")
-uk_unis <- read.csv("uk_universities_locations.csv")
+us_unis <- read.csv(here("Country Codes", "Data", "us_universities.csv"))
+uk_unis <- read.csv(here("Country Codes", "Data", "uk_universities_locations.csv"))
 ```
 
 
@@ -95,6 +100,150 @@ remaining_na <- filter(dat, is.na(author.s.country))
 
 print(remaining_na)
 ```
+
+
+```{r}
+# Read the CSV file containing U.S. state abbreviations
+us_states <- read.csv(here("Country Codes", "Data", "states.csv"))
+
+# Create a pattern for U.S. state abbreviations
+pattern_abbreviation <- paste0("(, | )(", paste(us_states$abbreviation, collapse="|"), ")[.)]$")
+
+# Create a pattern for "UK" at the end of the string
+pattern_uk <- "(, | )UK[.]?$"
+
+# Iterate over the rows in dat where author's country is NA
+for (i in which(is.na(dat$author.s.country))) {
+  # Check if the pattern for U.S. state abbreviations is found in dat$author.s.institution[i]
+  if (grepl(pattern_abbreviation, dat$author.s.institution[i])) {
+    # If a match is found for U.S. state abbreviations, assign "United States" to dat$author.s.country
+    dat$author.s.country[i] <- "United States"
+  } else if (grepl(pattern_uk, dat$author.s.institution[i])) {
+    # If a match is found for "UK", assign "United Kingdom" to dat$author.s.country
+    dat$author.s.country[i] <- "United Kingdom"
+  } else {
+    # If no match is found for abbreviations or "UK", check for the full U.S. state name
+    for (state in us_states$State) {
+      if (grepl(state, dat$author.s.institution[i], ignore.case = TRUE)) {
+        # If a match is found for the full U.S. state name, assign "United States" to dat$author.s.country
+        dat$author.s.country[i] <- "United States"
+        break
+      }
+    }
+  }
+}
+
+```
+
+
+```{r}
+# Change misidentified countries
+dat$author.s.country[dat$author.s.country == "Hamburg"] <- "Germany"
+
+# More Germany
+dat$author.s.country[grepl("Deutschland", dat$author.s.institution)] <- "Germany"
+
+# If "Republic of Korea" is found in author.s.institution, write "South Korea" in author.s.country
+dat$author.s.country[grepl("Republic of Korea", dat$author.s.institution)] <- "South Korea"
+
+# If "Brasil" is found in author.s.institution, write "Brazil" in author.s.country
+dat$author.s.country[grepl("Brasil", dat$author.s.institution)] <- "Brazil"
+
+# If "México" is found in author.s.institution, write "Mexico" in author.s.country
+dat$author.s.country[grepl("México", dat$author.s.institution)] <- "Mexico"
+
+# If "España" is found in author.s.institution, write "Spain" in author.s.country
+dat$author.s.country[grepl("España", dat$author.s.institution)] <- "Spain"
+
+# If "Shanghai" is found in author.s.institution, write "China" in author.s.country
+dat$author.s.country[grepl("Shanghai", dat$author.s.institution)] <- "China"
+
+# If "NYU" is found in author.s.institution, write "United States" in author.s.country
+dat$author.s.country[grepl("\\bNYU\\b", dat$author.s.institution)] <- "United States"
+
+# If "ÜNİVERSİTESİ" is found in author.s.institution, write "Turkey" in author.s.country
+dat$author.s.country[grepl("\\bÜNİVERSİTESİ\\b", dat$author.s.institution)] <- "Turkey"
+
+
+
+```
+
+
+```{r}
+# Global search for country code misses
+
+# Read the CSV file containing all the countries in the world
+countries <- read.csv(here("Country Codes", "Data", "countries.csv"))
+
+# Iterate over the rows in dat where author's country is NA
+for (i in which(is.na(dat$author.s.country))) {
+  # Check if any country name in countries$name is found in dat$author.s.institution[i]
+  for (country_name in countries$name) {
+    if (grepl(country_name, dat$author.s.institution[i], ignore.case = TRUE)) {
+      # If a match is found, assign the country name to dat$author.s.country
+      dat$author.s.country[i] <- country_name
+      break
+    }
+  }
+}
+```
+
+
+```{r}
+# Define mapping between abbreviations and full country names to find missing countries
+abbreviation_mapping <- c(USA = "United States",
+                          CAN = "Canada",
+                          JPN = "Japan",
+                          UAE = "United Arab Emirates",
+                          SAU = "Saudi Arabia",
+                          KOR = "South Korea",
+                          IND = "India",
+                          PAK = "Pakistan",
+                          QAT = "Qatar")
+
+# Create a pattern to match any of the abbreviations
+pattern_abbreviation <- paste0("\\b(", paste(names(abbreviation_mapping), collapse="|"), ")\\b")
+
+# Iterate over the rows in dat where author's country is NA
+for (i in which(is.na(dat$author.s.country))) {
+  # Check if the pattern for abbreviations is found in dat$author.s.institution[i]
+  if (grepl(pattern_abbreviation, dat$author.s.institution[i])) {
+    # Extract the matched abbreviation
+    matched_abbreviation <- regmatches(dat$author.s.institution[i], regexpr(pattern_abbreviation, dat$author.s.institution[i]))
+    
+    # Assign the corresponding full country name to dat$author.s.country
+    dat$author.s.country[i] <- abbreviation_mapping[matched_abbreviation]
+  }
+}
+```
+
+
+```{r}
+# Extract the author.s.institution values where author.s.country is NA
+na_institutions <- dat$author.s.institution[is.na(dat$author.s.country)]
+
+# Split the institutions into words
+words <- unlist(strsplit(na_institutions, "\\W"))
+
+# Create a table of word frequencies
+word_freq <- table(words)
+
+# Sort the table to see the most common words
+sorted_word_freq <- sort(word_freq, decreasing = TRUE)
+
+# Print the top common words
+head(sorted_word_freq, 30)
+```
+
+
+
+```{r}
+#If remaining <600, then finish manually
+remaining_na <- filter(dat, is.na(author.s.country))
+
+print(remaining_na)
+```
+
 
 ```{r}
 # write.csv(dat, file="author_country_7_13.csv", fileEncoding = "UTF-8")
