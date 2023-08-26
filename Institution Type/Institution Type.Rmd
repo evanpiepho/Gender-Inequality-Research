@@ -1,0 +1,431 @@
+---
+title: "Author Institution Category"
+author: "Evan Piepho"
+date: "2023-08-21"
+output:
+  html_document:
+    theme: readable
+    df_print: paged
+---
+    
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library( here )
+library( countrycode )
+library( jsonlite )
+library( dplyr )
+library( pander )
+library( stringi )
+library( stringr )
+library( readxl )
+library( fuzzyjoin )
+```
+
+
+```{r}
+setwd(here("Institution Type"))
+```
+
+
+```{r}
+inst_df <- read.csv(here("Institution Type", "Data", "Dimensions_ChatGPT&LLM_authorsCountriesStatesTypes - Dimensions_ChatGPT&LLM_authorsCountriesStatesTypes.csv"))
+```
+
+
+```{r}
+states <- read.csv(here("Institution Type", "Data", "states.csv"))
+```
+
+
+```{r}
+# Iterate over rows in inst_df$country where value is "???"
+for (i in which(inst_df$country == "???")) {
+  # Use stri_detect_fixed to check if any name in states$State is contained in inst_df$us_state
+  matches <- stri_detect_fixed(inst_df$us_state[i], states$State)
+  
+  # If there is a match, assign the corresponding location to inst_df$country
+  if (any(matches)) {
+    inst_df$country[i] <- "United States"
+  }
+}
+```
+
+
+```{r}
+# Define mapping between abbreviations and full country names to find missing countries
+abbreviation_mapping <- c(USA = "United States",
+                          CAN = "Canada",
+                          JPN = "Japan",
+                          UAE = "United Arab Emirates",
+                          SAU = "Saudi Arabia",
+                          KOR = "South Korea",
+                          IND = "India",
+                          PAK = "Pakistan",
+                          QAT = "Qatar",
+                          UK = "United Kingdom")
+
+# Create a pattern to match any of the abbreviations
+pattern_abbreviation <- paste0("\\b(", paste(names(abbreviation_mapping), collapse="|"), ")\\b")
+
+# Iterate over the rows in dat where author's country is "???"
+for (i in which(inst_df$country == "???")) {
+  # Check if the pattern for abbreviations is found in inst_df$institute[i]
+  if (grepl(pattern_abbreviation, inst_df$institute[i])) {
+    # Extract the matched abbreviation
+    matched_abbreviation <- regmatches(inst_df$institute[i], regexpr(pattern_abbreviation, inst_df$institute[i]))
+    
+    # Assign the corresponding full country name to inst_df$country
+    inst_df$country[i] <- abbreviation_mapping[matched_abbreviation]
+  }
+}
+```
+
+
+```{r}
+# CSVs of US and UK Universities, since most missing institutions are from there 
+
+us_unis <- read_excel(here("Institution Type", "Data", "us-colleges-and-universities.xlsx"), sheet = 1)
+uk_unis <- read.csv(here("Institution Type", "Data", "uk_universities_locations.csv"))
+
+# Loop through each university name in us_unis
+for (uni in us_unis$NAME) {
+  # Create a regex pattern for this specific university
+  pattern <- str_c("\\b", uni, "\\b")
+  
+  # Update inst_df for rows that match the current university and have country as "???"
+  inst_df$country[inst_df$country == "???" & grepl(pattern, inst_df$institute, ignore.case = TRUE)] <- "United States"
+}
+
+# Loop through each university name in us_unis
+for (uni in uk_unis$Name) {
+  # Create a regex pattern for this specific university
+  pattern <- str_c("\\b", uni, "\\b")
+  
+  # Update inst_df for rows that match the current university and have country as "???"
+  inst_df$country[inst_df$country == "???" & grepl(pattern, inst_df$institute, ignore.case = TRUE)] <- "United Kingdom"
+}
+
+```
+
+
+```{r}
+# Find medical centers
+
+inst_df$institute.lower <- NA
+inst_df$institute.lower <- tolower(inst_df$institute)
+
+inst_df$type.2 <- NA
+
+# Search for medical terms and assign "Medical Center"
+inst_df$type.2[grepl("university", inst_df$institute.lower) & grepl("medicine", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("college", inst_df$institute.lower) & grepl("medicine", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("university", inst_df$institute.lower) & grepl("\\bmedical\\b", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("medical center", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("medicine", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("medical sciences", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("medical college", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("medical school", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("hospital", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("\\bclinic\\b", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("dentistry", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("health sciences", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("eye", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("healthcare", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("health care", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("primary care", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("neurosurgery", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("cancer", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("langone", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("dental school", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("anaesthesiology", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("paediatrics", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("hôpital", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[grepl("neuroradiology", inst_df$institute.lower)] <- "Medical Center"
+inst_df$type.2[1178] <- "Industry"
+inst_df$type.2[882] <- "University"
+inst_df$type.2[1485] <- "Industry"
+inst_df$type.2[584] <- "Medical Center"
+inst_df$type.2[932] <- "Medical Center"
+inst_df$type.2[1225] <- "Medical Center"
+
+is.na.type <- filter(inst_df, is.na(type.2))
+
+specialties <- read.csv(here("Institution Type", "Data", "medical-specialties.csv"))
+
+
+# Iterated over types where NA
+for (i in which(is.na(inst_df$type.2))) {
+  # Use stri_detect_fixed to check if any string in specialties$Specialty occurs in inst_df$institute
+  matches <- stri_detect_fixed(inst_df$institute[i], specialties$Specialty)
+  
+  # If there is a match, assign "Medical Center" to inst_df$type.2
+  if (any(matches)) {
+    inst_df$type.2[i] <- "Medical Center" 
+  }
+}
+```
+
+
+```{r}
+# Find universities
+
+for (i in which(is.na(inst_df$type.2))) {
+  # Check for education terms in inst_df$institute.lower[i]
+  if (grepl("school", inst_df$institute.lower[i])) {
+    # If a match is found for "school", place "University" in inst_df$type.2[i] (etc.)
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("college", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("université", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitet", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("üniversitesi", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("università", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitas", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universidad", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitario", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitaria", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitário", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universität", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitat", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universiti", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitat", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universite", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("universitaire", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("univ.", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("institute of technology", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else if (grepl("eth zurich", inst_df$institute.lower[i])) {
+    inst_df$type.2[i] <- "University"
+  } else {
+    inst_df$type.2[i] <- NA
+      }
+    }
+
+
+
+# inst_df$type.2[grepl("universitaire", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("univ.", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("institute of technology", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("teaching", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("massachusetts general", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("mass general", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("beth israel", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("brigham and", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("cornell", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("mayo clinic", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("stanford", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("penn medicine", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("uc san diego", inst_df$institute.lower)] <- "University"
+# inst_df$type.2[grepl("eth zurich", inst_df$institute.lower)] <- "University"
+
+
+
+```
+
+
+```{r}
+# Find Indian "Institute of"
+
+for (i in which(is.na(inst_df$type.2))) {
+    if (grepl("institute of", inst_df$institute.lower[i]) & grepl("india", inst_df$institute.lower)[i]) {
+      inst_df$type.2[i] <- "University"
+    } else {
+      next
+    }
+}
+
+filtered_data <- inst_df %>%
+  filter(
+    grepl("institute of", institute.lower) &
+    country == "India"
+  )
+```
+
+
+```{r}
+# Correct state column
+inst_df <- inst_df %>%
+  mutate(
+    us_state = ifelse(
+      country != "United States" & us_state %in% states$State,
+      NA, 
+      us_state
+    )
+  )
+```
+
+
+```{r}
+remaining_na_type <- filter(inst_df, is.na(type.2))
+remaining_na_country <- filter(inst_df, country == "???")
+remaining_na_state <- filter(inst_df, country == "United States" & is.na(inst_df$us_state))
+
+count(remaining_na_type)
+count(remaining_na_country)
+count(remaining_na_state)
+```
+
+
+```{r}
+# Find Chinese Institutions
+
+cn_cities <- read.csv(here("Institution Type", "Data", "cn.csv"))
+
+# Iterate over rows in inst_df$country where value is "???"
+for (i in which (inst_df$country == "???")) {
+  # Use stri_detect_fixed to check if any string in cn_cities$city occurs in inst_df$institute
+  matches <- stri_detect_fixed(inst_df$institute[i], cn_cities$city)
+  
+  # If there is a match, assign "Medical Center" to inst_df$type.2
+  if (any(matches)) {
+    inst_df$country[i] <- "China" 
+  }
+}
+  
+# Iterate over rows in inst_df$country where value is "???"
+for (i in which (inst_df$country == "???")) {
+  # Use stri_detect_fixed to check if any string in cn_cities$admin_name occurs in inst_df$institute
+  matches <- stri_detect_fixed(inst_df$institute[i], cn_cities$admin_name)
+  
+  # If there is a match, assign "Medical Center" to inst_df$type.2
+  if (any(matches)) {
+    inst_df$country[i] <- "China" 
+  }
+} 
+
+```
+
+
+```{r}
+unis <- read.csv(here("Institution Type", "Data", "world-universities.csv"))
+countries <-read.csv(here("Institution Type", "Data", "country-codes.csv"))
+
+result <- unis %>%
+  left_join(countries, by = c("code" = "Code"))
+
+```
+
+
+```{r}
+# Clear up missing countries
+
+inst_df$country[grepl("españa", inst_df$institute.lower)] <- "Spain"
+inst_df$country[grepl("korea", inst_df$institute.lower)] <- "South Korea"
+
+for (i in which (inst_df$country == "???")) {
+    # Use stri_detect_fixed to check if any string in cn_cities$admin_name occurs in inst_df$institute
+  matches <- stri_detect_fixed(inst_df$institute[i], result$university)
+
+    # If there is a match, assign country name
+  if (any(matches)) {
+    inst_df$country[i] <- result$Name[i]
+  }
+}  
+
+
+inst_df$us_state[grepl("Jersey", inst_df$country)] <- "New Jersey"
+inst_df$country[grepl("Jersey", inst_df$country)] <- "United States"
+inst_df$us_state[grepl("\\?\\?\\?", inst_df$us_state)] <- NA
+
+
+inst_df$us_state[c(15, 16, 35, 51, 52, 69, 77, 97, 137, 138, 147, 169, 170, 173, 176, 256, 292, 327, 331, 332, 350, 365, 457)] <- NA
+inst_df$country[1296] <- "Pakistan"
+inst_df$country[1306] <- "France"
+inst_df$us_state[1306] <- NA
+
+inst_df$country[1094] <- "Canada"
+inst_df$us_state[1094] <- NA
+
+inst_df$us_state[20] <- "Colorado"
+
+inst_df$country[996] <- "Germany"
+inst_df$us_state[996] <- NA
+
+inst_df$us_state[838] <- "Florida"
+
+inst_df$us_state[c(1342, 1376, 1448)] <- "California"
+
+inst_df$country[1139] <- "United Kingdom"
+inst_df$us_state[1139] <- NA
+
+inst_df$country[c(535, 536, 648, 837, 960, 961, 962, 972, 1053, 1208, 1209)] <- "India"
+inst_df$us_state[c(535, 536, 648, 837, 960, 961, 962, 972, 1053, 1208, 1209)] <- NA
+
+inst_df$country[1262] <- "Thailand"
+inst_df$us_state[1262] <- NA
+
+inst_df$country[567] <- "Barbados"
+inst_df$us_state[567] <- NA
+
+inst_df$country[c(940, 941)] <- "Pakistan"
+inst_df$us_state[c(940, 941)] <- NA
+
+inst_df$us_state[662] <- "California"
+
+inst_df$country[c(1137, 1138)] <- "United Kingdom"
+inst_df$us_state[c(1137, 1138)] <- NA
+
+inst_df$us_state[776] <- "Texas"
+
+inst_df$us_state[110] <- "Michigan"
+
+inst_df$us_state[c(847, 851)] <- "North Carolina"
+
+inst_df$us_state[1030] <- "New York"
+
+inst_df$us_state[1529] <- "California"
+
+inst_df$us_state[c(927, 944, 945)] <- "Washington D.C."
+
+inst_df$country[c(93, 94, 96)] <- "United States"
+
+
+
+```
+
+
+```{r}
+# Clear up missing states
+
+for (i in which (inst_df$country == "United States" & is.na(inst_df$us_state))) {
+    # Use stri_detect_fixed to check if any string in cn_cities$admin_name occurs in inst_df$institute
+  matches <- stri_detect_fixed(inst_df$institute[i], us_unis$NAME[i])
+
+    # If there is a match, assign country name
+  if (any(matches)) {
+    inst_df$us_state[i] <- us_unis$STATE[i]
+  }
+}
+
+inst_df$us_state[703] <- "Delaware"
+```
+
+
+```{r}
+final_df <- inst_df
+final_df <- subset(final_df, select = -c(type, institute.lower))
+
+write.csv(final_df, file ="Updated_Dimensions_ChatGPT&LLM_authorsCountriesStatesTypes.csv", fileEncoding = "UTF-8")
+```
+
